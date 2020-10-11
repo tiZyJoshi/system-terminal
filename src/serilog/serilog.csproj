@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Terminal.Serilog</AssemblyName>
+        <IsPackable>true</IsPackable>
+        <PackageDescription>
+$(PackageDescription)
+
+This package provides a logging sink for Serilog.
+        </PackageDescription>
+        <RootNamespace>Serilog</RootNamespace>
+        <TargetFramework>net5.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\core\core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog" />
+    </ItemGroup>
+</Project>
