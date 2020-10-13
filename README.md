@@ -3,6 +3,7 @@
 [![Terminal](https://img.shields.io/nuget/v/Terminal.svg?label=Terminal)](https://www.nuget.org/packages/Terminal)
 [![Terminal.Extensions](https://img.shields.io/nuget/v/Terminal.Extensions.svg?label=Terminal.Extensions)](https://www.nuget.org/packages/Terminal.Extensions)
 [![Terminal.Input](https://img.shields.io/nuget/v/Terminal.Input.svg?label=Terminal.Input)](https://www.nuget.org/packages/Terminal.Input)
+[![Terminal.Views](https://img.shields.io/nuget/v/Terminal.Views.svg?label=Terminal.Views)](https://www.nuget.org/packages/Terminal.Views)
 
 `System.Terminal` is a toolkit for writing terminal-based applications. It is
 effectively a complete replacement for `System.Console`.
@@ -32,6 +33,8 @@ This project offers the following packages:
   Provides terminal hosting and logging for the .NET Generic Host.
 * [Terminal.Input](https://www.nuget.org/packages/Terminal.Input): Provides an
   interactive line editor.
+* [Terminal.Views](https://www.nuget.org/packages/Terminal.Views): Provides a
+  terminal UI framework based on the model-view-update (MVU) architecture.
 
 To install a package, run `dotnet add package <name>`.
 

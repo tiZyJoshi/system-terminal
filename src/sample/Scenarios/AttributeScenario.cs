@@ -7,8 +7,10 @@ namespace Sample.Scenarios
     [SuppressMessage("Microsoft.Performance", "CA1812", Justification = "Used.")]
     sealed class AttributeScenario : IScenario
     {
-        public Task RunAsync()
+        public async Task RunAsync()
         {
+            await Task.Yield();
+
             Terminal.ForegroundColor(255, 0, 0);
             Terminal.OutLine("This text is red.");
             Terminal.ResetAttributes();
@@ -68,8 +70,6 @@ namespace Sample.Scenarios
             Terminal.OpenHyperlink(new("https://google.com"), "google");
             Terminal.OutLine("This is a hyperlink with an ID.");
             Terminal.CloseHyperlink();
-
-            return Task.CompletedTask;
         }
     }
 }

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Terminal.Views</AssemblyName>
+        <IsPackable>true</IsPackable>
+        <PackageDescription>
+$(PackageDescription)
+
+This package provides a UI framework based on the model-view-update (MVU)
+architecture.
+        </PackageDescription>
+        <RootNamespace>System.Views</RootNamespace>
+        <TargetFramework>netcoreapp5.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\core\core.csproj" />
+    </ItemGroup>
+</Project>

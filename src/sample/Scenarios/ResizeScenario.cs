@@ -8,15 +8,17 @@ namespace Sample.Scenarios
     [SuppressMessage("Microsoft.Performance", "CA1812", Justification = "Used.")]
     sealed class ResizeScenario : IScenario
     {
-        public Task RunAsync()
+        public async Task RunAsync()
         {
+            await Task.Yield();
+
             Terminal.OutLine("Listening for resize events.");
             Terminal.OutLine();
 
             Terminal.Resize += (sender, e) =>
                 Terminal.OutLine("Width = {0}, Height = {1}", e.Size.Width, e.Size.Height);
 
-            return Task.Delay(Timeout.Infinite);
+            await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
         }
     }
 }

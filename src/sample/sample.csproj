@@ -9,5 +9,6 @@
     <ItemGroup>
         <ProjectReference Include="..\extensions\extensions.csproj" />
         <ProjectReference Include="..\input\input.csproj" />
+        <ProjectReference Include="..\views\views.csproj" />
     </ItemGroup>
 </Project>

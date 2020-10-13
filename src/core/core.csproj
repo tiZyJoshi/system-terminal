@@ -13,6 +13,7 @@ This package provides the core terminal API.
 
     <ItemGroup>
         <InternalsVisibleTo Include="Terminal.Extensions" />
+        <InternalsVisibleTo Include="Terminal.Views" />
     </ItemGroup>
 
     <ItemGroup>

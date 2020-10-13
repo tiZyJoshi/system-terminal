@@ -7,8 +7,10 @@ namespace Sample.Scenarios
     [SuppressMessage("Microsoft.Performance", "CA1812", Justification = "Used.")]
     sealed class ScrollRegionScenario : IScenario
     {
-        public Task RunAsync()
+        public async Task RunAsync()
         {
+            await Task.Yield();
+
             Terminal.SetScrollRegion(2, 0);
 
             try

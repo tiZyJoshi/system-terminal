@@ -7,8 +7,10 @@ namespace Sample.Scenarios
     [SuppressMessage("Microsoft.Performance", "CA1812", Justification = "Used.")]
     sealed class SignalScenario : IScenario
     {
-        public Task RunAsync()
+        public async Task RunAsync()
         {
+            await Task.Yield();
+
             Terminal.OutLine("Available commands:");
             Terminal.OutLine();
             Terminal.OutLine("  install: Install break signal handler.");

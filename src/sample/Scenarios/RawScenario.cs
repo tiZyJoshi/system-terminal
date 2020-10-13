@@ -7,8 +7,10 @@ namespace Sample.Scenarios
     [SuppressMessage("Microsoft.Performance", "CA1812", Justification = "Used.")]
     sealed class RawScenario : IScenario
     {
-        public Task RunAsync()
+        public async Task RunAsync()
         {
+            await Task.Yield();
+
             Terminal.OutLine("Entering raw mode.");
             Terminal.OutLine();
 
@@ -27,8 +29,6 @@ namespace Sample.Scenarios
             {
                 Terminal.SetRawMode(false, true);
             }
-
-            return Task.CompletedTask;
         }
     }
 }
