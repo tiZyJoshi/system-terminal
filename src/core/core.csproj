@@ -27,6 +27,5 @@ This package provides the core terminal API.
             <PrivateAssets>none</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Mono.Posix.NETStandard" />
-        <PackageReference Include="Vanara.PInvoke.Kernel32" />
     </ItemGroup>
 </Project>

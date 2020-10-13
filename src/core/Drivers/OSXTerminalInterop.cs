@@ -97,13 +97,13 @@ namespace System.Drivers
 
         const uint TIOCGWINSZ = 0x40087468;
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int tcgetattr(int fd, out termios termios_p);
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int tcsetattr(int fd, int optional_actions, in termios termios_p);
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int ioctl(int fildes, UIntPtr request, out winsize argp);
 
         public static OSXTerminalInterop Instance { get; } = new();

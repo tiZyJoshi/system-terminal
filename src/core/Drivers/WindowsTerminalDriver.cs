@@ -1,7 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
-using Vanara.PInvoke;
 
 namespace System.Drivers
 {
@@ -10,7 +11,7 @@ namespace System.Drivers
     {
         sealed class WindowsTerminalReader : TerminalReader
         {
-            public HFILE Handle { get; }
+            public IntPtr Handle { get; }
 
             public bool IsValid { get; }
 
@@ -20,7 +21,7 @@ namespace System.Drivers
 
             readonly string _name;
 
-            public WindowsTerminalReader(TerminalDriver driver, HFILE handle, string name)
+            public WindowsTerminalReader(TerminalDriver driver, IntPtr handle, string name)
                 : base(driver)
             {
                 Handle = handle;
@@ -28,24 +29,24 @@ namespace System.Drivers
                 _name = name;
             }
 
-            public Kernel32.CONSOLE_INPUT_MODE? GetMode()
+            public uint? GetMode()
             {
-                return Kernel32.GetConsoleMode(Handle, out Kernel32.CONSOLE_INPUT_MODE m) ? m : null;
+                return WindowsTerminalInterop.GetConsoleMode(Handle, out var m) ? m : null;
             }
 
-            public bool SetMode(Kernel32.CONSOLE_INPUT_MODE mode)
+            public bool SetMode(uint mode)
             {
-                return Kernel32.SetConsoleMode(Handle, mode);
+                return WindowsTerminalInterop.SetConsoleMode(Handle, mode);
             }
 
-            public bool AddMode(Kernel32.CONSOLE_INPUT_MODE mode)
+            public bool AddMode(uint mode)
             {
-                return GetMode() is Kernel32.CONSOLE_INPUT_MODE m && Kernel32.SetConsoleMode(Handle, m | mode);
+                return GetMode() is uint m && WindowsTerminalInterop.SetConsoleMode(Handle, m | mode);
             }
 
-            public bool RemoveMode(Kernel32.CONSOLE_INPUT_MODE mode)
+            public bool RemoveMode(uint mode)
             {
-                return GetMode() is Kernel32.CONSOLE_INPUT_MODE m && Kernel32.SetConsoleMode(Handle, m & ~mode);
+                return GetMode() is uint m && WindowsTerminalInterop.SetConsoleMode(Handle, m & ~mode);
             }
 
             public override unsafe int Read(Span<byte> data)
@@ -56,21 +57,30 @@ namespace System.Drivers
                 uint ret;
 
                 lock (_lock)
+                {
                     fixed (byte* p = data)
-                        if (Kernel32.ReadFile(Handle, (IntPtr)p, (uint)data.Length, out ret, IntPtr.Zero))
-                            return (int)ret;
+                    {
+                        var result = IsRedirected ?
+                            WindowsTerminalInterop.ReadFile(Handle, p, (uint)data.Length, out ret, null) :
+                            WindowsTerminalInterop.ReadConsole(Handle, p, (uint)data.Length, out ret, null);
 
-                var err = Win32Error.GetLastError();
+                        if (result)
+                            return (int)ret;
+                    }
+                }
+
+                var err = Marshal.GetLastWin32Error();
 
                 // See comments in UnixTerminalReader for the error handling rationale.
-                switch ((uint)err)
+                switch (err)
                 {
-                    case Win32Error.ERROR_HANDLE_EOF:
-                    case Win32Error.ERROR_BROKEN_PIPE:
-                    case Win32Error.ERROR_NO_DATA:
+                    case WindowsTerminalInterop.ERROR_HANDLE_EOF:
+                    case WindowsTerminalInterop.ERROR_BROKEN_PIPE:
+                    case WindowsTerminalInterop.ERROR_NO_DATA:
                         break;
                     default:
-                        throw new TerminalException($"Could not read from standard {_name}: {err.FormatMessage()}");
+                        throw new TerminalException(
+                            $"Could not read from standard {_name}: {new Win32Exception(err).Message}");
                 }
 
                 return (int)ret;
@@ -79,7 +89,7 @@ namespace System.Drivers
 
         sealed class WindowsTerminalWriter : TerminalWriter
         {
-            public HFILE Handle { get; }
+            public IntPtr Handle { get; }
 
             public bool IsValid { get; }
 
@@ -89,7 +99,7 @@ namespace System.Drivers
 
             readonly string _name;
 
-            public WindowsTerminalWriter(TerminalDriver driver, HFILE handle, string name)
+            public WindowsTerminalWriter(TerminalDriver driver, IntPtr handle, string name)
                 : base(driver)
             {
                 Handle = handle;
@@ -97,24 +107,24 @@ namespace System.Drivers
                 _name = name;
             }
 
-            public Kernel32.CONSOLE_OUTPUT_MODE? GetMode()
+            public uint? GetMode()
             {
-                return Kernel32.GetConsoleMode(Handle, out Kernel32.CONSOLE_OUTPUT_MODE m) ? m : null;
+                return WindowsTerminalInterop.GetConsoleMode(Handle, out var m) ? m : null;
             }
 
-            public bool SetMode(Kernel32.CONSOLE_OUTPUT_MODE mode)
+            public bool SetMode(uint mode)
             {
-                return Kernel32.SetConsoleMode(Handle, mode);
+                return WindowsTerminalInterop.SetConsoleMode(Handle, mode);
             }
 
-            public bool AddMode(Kernel32.CONSOLE_OUTPUT_MODE mode)
+            public bool AddMode(uint mode)
             {
-                return GetMode() is Kernel32.CONSOLE_OUTPUT_MODE m && Kernel32.SetConsoleMode(Handle, m | mode);
+                return GetMode() is uint m && WindowsTerminalInterop.SetConsoleMode(Handle, m | mode);
             }
 
-            public bool RemoveMode(Kernel32.CONSOLE_OUTPUT_MODE mode)
+            public bool RemoveMode(uint mode)
             {
-                return GetMode() is Kernel32.CONSOLE_OUTPUT_MODE m && Kernel32.SetConsoleMode(Handle, m & ~mode);
+                return GetMode() is uint m && WindowsTerminalInterop.SetConsoleMode(Handle, m & ~mode);
             }
 
             public override unsafe void Write(ReadOnlySpan<byte> data)
@@ -123,32 +133,41 @@ namespace System.Drivers
                     return;
 
                 lock (_lock)
+                {
                     fixed (byte* p = data)
-                        if (Kernel32.WriteFile(Handle, (IntPtr)p, (uint)data.Length, out _, IntPtr.Zero))
-                            return;
+                    {
+                        var result = IsRedirected ?
+                            WindowsTerminalInterop.WriteFile(Handle, p, (uint)data.Length, out _, null) :
+                            WindowsTerminalInterop.WriteConsole(Handle, p, (uint)data.Length, out _, null);
 
-                var err = Win32Error.GetLastError();
+                        if (result)
+                            return;
+                    }
+                }
+
+                var err = Marshal.GetLastWin32Error();
 
                 // See comments in UnixTerminalWriter for the error handling rationale.
-                switch ((uint)err)
+                switch (err)
                 {
-                    case Win32Error.ERROR_HANDLE_EOF:
-                    case Win32Error.ERROR_BROKEN_PIPE:
-                    case Win32Error.ERROR_NO_DATA:
+                    case WindowsTerminalInterop.ERROR_HANDLE_EOF:
+                    case WindowsTerminalInterop.ERROR_BROKEN_PIPE:
+                    case WindowsTerminalInterop.ERROR_NO_DATA:
                         break;
                     default:
-                        throw new TerminalException($"Could not write to standard {_name}: {err.FormatMessage()}");
+                        throw new TerminalException(
+                            $"Could not write to standard {_name}: {new Win32Exception(err).Message}");
                 }
             }
         }
 
         public static WindowsTerminalDriver Instance { get; } = new();
 
-        static HFILE InHandle => Kernel32.GetStdHandle(Kernel32.StdHandleType.STD_INPUT_HANDLE);
+        static IntPtr InHandle => WindowsTerminalInterop.GetStdHandle(WindowsTerminalInterop.STD_INPUT_HANDLE);
 
-        static HFILE OutHandle => Kernel32.GetStdHandle(Kernel32.StdHandleType.STD_OUTPUT_HANDLE);
+        static IntPtr OutHandle => WindowsTerminalInterop.GetStdHandle(WindowsTerminalInterop.STD_OUTPUT_HANDLE);
 
-        static HFILE ErrorHandle => Kernel32.GetStdHandle(Kernel32.StdHandleType.STD_ERROR_HANDLE);
+        static IntPtr ErrorHandle => WindowsTerminalInterop.GetStdHandle(WindowsTerminalInterop.STD_ERROR_HANDLE);
 
         public override TerminalReader StdIn => _in;
 
@@ -175,7 +194,7 @@ namespace System.Drivers
 
         readonly WindowsTerminalWriter _error;
 
-        readonly Kernel32.HandlerRoutine _handler;
+        readonly WindowsTerminalInterop.HandlerRoutine _handler;
 
         TerminalSize? _size;
 
@@ -185,20 +204,20 @@ namespace System.Drivers
             _out = new(this, OutHandle, "output");
             _error = new(this, ErrorHandle, "error");
 
-            _ = Kernel32.SetConsoleCP((uint)Encoding.CodePage);
-            _ = Kernel32.SetConsoleOutputCP((uint)Encoding.CodePage);
+            _ = WindowsTerminalInterop.SetConsoleCP((uint)Encoding.CodePage);
+            _ = WindowsTerminalInterop.SetConsoleOutputCP((uint)Encoding.CodePage);
 
             var inMode =
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_PROCESSED_INPUT |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_LINE_INPUT |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_ECHO_INPUT |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_INSERT_MODE |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_EXTENDED_FLAGS |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_VIRTUAL_TERMINAL_INPUT;
+                WindowsTerminalInterop.ENABLE_PROCESSED_INPUT |
+                WindowsTerminalInterop.ENABLE_LINE_INPUT |
+                WindowsTerminalInterop.ENABLE_ECHO_INPUT |
+                WindowsTerminalInterop.ENABLE_INSERT_MODE |
+                WindowsTerminalInterop.ENABLE_EXTENDED_FLAGS |
+                WindowsTerminalInterop.ENABLE_VIRTUAL_TERMINAL_INPUT;
             var outMode =
-                Kernel32.CONSOLE_OUTPUT_MODE.ENABLE_PROCESSED_OUTPUT |
-                Kernel32.CONSOLE_OUTPUT_MODE.ENABLE_WRAP_AT_EOL_OUTPUT |
-                Kernel32.CONSOLE_OUTPUT_MODE.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                WindowsTerminalInterop.ENABLE_PROCESSED_OUTPUT |
+                WindowsTerminalInterop.ENABLE_WRAP_AT_EOL_OUTPUT |
+                WindowsTerminalInterop.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
             // Set modes on all handles in case one of them has been redirected. These calls can
             // fail if there is no console attached, but that is OK.
@@ -206,9 +225,9 @@ namespace System.Drivers
             _ = _out.AddMode(outMode) || _error.AddMode(outMode);
 
             // Keep the delegate alive by storing it in a field.
-            _handler = e => HandleBreakSignal(e == Kernel32.CTRL_EVENT.CTRL_C_EVENT);
+            _handler = e => HandleBreakSignal(e == WindowsTerminalInterop.CTRL_C_EVENT);
 
-            _ = Kernel32.SetConsoleCtrlHandler(_handler, true);
+            _ = WindowsTerminalInterop.SetConsoleCtrlHandler(_handler, true);
 
             // Windows currently has no SIGWINCH equivalent, so we have to poll for size changes.
             _ = TerminalUtility.StartThread("Terminal Resize Listener", () =>
@@ -242,10 +261,10 @@ namespace System.Drivers
 
         public override void GenerateBreakSignal(TerminalBreakSignal signal)
         {
-            _ = Kernel32.GenerateConsoleCtrlEvent(signal switch
+            _ = WindowsTerminalInterop.GenerateConsoleCtrlEvent(signal switch
             {
-                TerminalBreakSignal.Interrupt => Kernel32.CTRL_EVENT.CTRL_C_EVENT,
-                TerminalBreakSignal.Quit => Kernel32.CTRL_EVENT.CTRL_BREAK_EVENT,
+                TerminalBreakSignal.Interrupt => WindowsTerminalInterop.CTRL_C_EVENT,
+                TerminalBreakSignal.Quit => WindowsTerminalInterop.CTRL_BREAK_EVENT,
                 _ => throw new ArgumentOutOfRangeException(nameof(signal)),
             }, 0);
         }
@@ -255,37 +274,37 @@ namespace System.Drivers
             // Windows does not have an equivalent of SIGTSTP.
         }
 
-        static unsafe bool IsHandleValid(HFILE handle, bool write)
+        static unsafe bool IsHandleValid(IntPtr handle, bool write)
         {
-            if (handle.IsNull || handle.IsInvalid)
+            if (handle == null || handle == WindowsTerminalInterop.INVALID_HANDLE_VALUE)
                 return false;
 
             if (write)
             {
                 byte dummy = 42;
 
-                return Kernel32.WriteFile(handle, (IntPtr)(&dummy), 0, out _, IntPtr.Zero);
+                return WindowsTerminalInterop.WriteFile(handle, &dummy, 0, out _, null);
             }
 
             return true;
         }
 
-        static bool IsRedirected(HFILE handle)
+        static bool IsRedirected(IntPtr handle)
         {
-            return !Kernel32.GetFileType(handle).HasFlag(Kernel32.FileType.FILE_TYPE_CHAR) ||
-                !Kernel32.GetConsoleMode(handle, out Kernel32.CONSOLE_INPUT_MODE _);
+            return (WindowsTerminalInterop.GetFileType(handle) & WindowsTerminalInterop.FILE_TYPE_CHAR) == 0 ||
+                !WindowsTerminalInterop.GetConsoleMode(handle, out _);
         }
 
         TerminalSize? GetSize()
         {
-            static Kernel32.CONSOLE_SCREEN_BUFFER_INFO? GetInfo(HFILE handle)
+            static WindowsTerminalInterop.CONSOLE_SCREEN_BUFFER_INFO? Get(IntPtr handle)
             {
-                return Kernel32.GetConsoleScreenBufferInfo(handle, out var info) ? info : null;
+                return WindowsTerminalInterop.GetConsoleScreenBufferInfo(handle, out var info) ? info : null;
             }
 
             // Try both handles in case only one of them has been redirected.
-            return (GetInfo(_out.Handle) ?? GetInfo(_error.Handle)) is Kernel32.CONSOLE_SCREEN_BUFFER_INFO i ?
-                new(i.srWindow.Right - i.srWindow.Left + 1, i.srWindow.Bottom - i.srWindow.Top + 1) : null;
+            return (Get(_out.Handle) ?? Get(_error.Handle)) is WindowsTerminalInterop.CONSOLE_SCREEN_BUFFER_INFO info ?
+                new(info.srWindow.Right - info.srWindow.Left + 1, info.srWindow.Bottom - info.srWindow.Top + 1) : null;
         }
 
         protected override void SetRawModeCore(bool raw, bool discard)
@@ -294,20 +313,20 @@ namespace System.Drivers
                 throw new TerminalException("There is no terminal attached.");
 
             var inMode =
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_PROCESSED_INPUT |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_LINE_INPUT |
-                Kernel32.CONSOLE_INPUT_MODE.ENABLE_ECHO_INPUT;
+                WindowsTerminalInterop.ENABLE_PROCESSED_INPUT |
+                WindowsTerminalInterop.ENABLE_LINE_INPUT |
+                WindowsTerminalInterop.ENABLE_ECHO_INPUT;
             var outMode =
-                Kernel32.CONSOLE_OUTPUT_MODE.DISABLE_NEWLINE_AUTO_RETURN;
+                WindowsTerminalInterop.DISABLE_NEWLINE_AUTO_RETURN;
 
             if (!(raw ? _in.RemoveMode(inMode) && (_out.RemoveMode(outMode) || _error.RemoveMode(outMode)) :
                 _in.AddMode(inMode) && (_out.AddMode(outMode) || _error.AddMode(outMode))))
                 throw new TerminalException(
-                    $"Could not change raw mode setting: {Win32Error.GetLastError().FormatMessage()}");
+                    $"Could not change raw mode setting: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
 
-            if (!Kernel32.FlushConsoleInputBuffer(InHandle))
+            if (!WindowsTerminalInterop.FlushConsoleInputBuffer(InHandle))
                 throw new TerminalException(
-                    $"Could not flush input buffer: {Win32Error.GetLastError().FormatMessage()}");
+                    $"Could not flush input buffer: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
         }
     }
 }

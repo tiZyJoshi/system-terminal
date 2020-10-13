@@ -99,13 +99,13 @@ namespace System.Drivers
 
         const uint TIOCGWINSZ = 0x5413;
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int tcgetattr(int fd, out termios termios_p);
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int tcsetattr(int fd, int optional_actions, in termios termios_p);
 
-        [DllImport("libc")]
+        [DllImport("libc", SetLastError = true)]
         static extern int ioctl(int fd, UIntPtr request, out winsize argp);
 
         public static LinuxTerminalInterop Instance { get; } = new();

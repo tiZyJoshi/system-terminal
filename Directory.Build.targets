@@ -39,9 +39,6 @@
             <Version>1.2.0-beta.205</Version>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Update="Vanara.PInvoke.Kernel32">
-            <Version>3.2.17</Version>
-        </PackageReference>
     </ItemGroup>
 
     <Import Project="src\core\Terminal.targets" />
